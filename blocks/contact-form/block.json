@@ -1,0 +1,22 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "scfb/contact-form",
+	"title": "Contact Form",
+	"category": "widgets",
+	"icon": "email-alt",
+	"description": "Display a contact form.",
+	"keywords": [ "contact", "form", "email", "message" ],
+	"textdomain": "simple-contact-form-block",
+	"render": "file:./render.php",
+	"attributes": {
+		"email": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"html": false
+	}
+}
+
