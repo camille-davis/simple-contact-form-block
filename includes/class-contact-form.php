@@ -69,7 +69,7 @@ class SCFB_Contact_Form {
 		wp_register_script(
 			'scfb-contact-form-block-editor',
 			$this->plugin_url . 'blocks/contact-form/index.js',
-			array( 'wp-blocks', 'wp-block-editor', 'wp-server-side-render', 'wp-element', 'wp-components', 'wp-i18n' ),
+			array( 'wp-blocks', 'wp-block-editor', 'wp-server-side-render', 'wp-element', 'wp-components', 'wp-i18n', 'wp-primitives' ),
 			self::VERSION,
 			true
 		);

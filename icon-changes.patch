@@ -1,0 +1,54 @@
+diff --git a/blocks/contact-form/block.json b/blocks/contact-form/block.json
+index 87536fc..2d75e55 100644
+--- a/blocks/contact-form/block.json
++++ b/blocks/contact-form/block.json
+@@ -4,7 +4,6 @@
+ 	"name": "scfb/contact-form",
+ 	"title": "Contact Form",
+ 	"category": "widgets",
+-	"icon": "email-alt",
+ 	"description": "Display a contact form.",
+ 	"keywords": [ "contact", "form", "email", "message" ],
+ 	"textdomain": "simple-contact-form-block",
+diff --git a/blocks/contact-form/index.js b/blocks/contact-form/index.js
+index 339be3e..bf66eaa 100644
+--- a/blocks/contact-form/index.js
++++ b/blocks/contact-form/index.js
+@@ -7,8 +7,24 @@
+ 	const { useBlockProps, InspectorControls } = wp.blockEditor;
+ 	const { PanelBody, TextControl } = wp.components;
+ 	const { createElement: el } = wp.element;
++	const { SVG, Path } = wp.primitives;
++
++	// Email icon SVG.
++	const emailIcon = el(SVG, {
++		viewBox: '0 0 24 24',
++		xmlns: 'http://www.w3.org/2000/svg',
++		width: 24,
++		height: 24,
++		'aria-hidden': true,
++		focusable: false,
++	}, el(Path, {
++		d: 'M3 7c0-1.1.9-2 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm2-.5h14c.3 0 .5.2.5.5v1L12 13.5 4.5 7.9V7c0-.3.2-.5.5-.5Zm-.5 3.3V17c0 .3.2.5.5.5h14c.3 0 .5-.2.5-.5V9.8L12 15.4 4.5 9.8Z',
++		fillRule: 'evenodd',
++		clipRule: 'evenodd',
++	}));
+ 
+ 	registerBlockType('scfb/contact-form', {
++		icon: emailIcon,
+ 		edit: function (props) {
+ 			const { attributes, setAttributes } = props;
+ 			const { email } = attributes;
+diff --git a/includes/class-contact-form.php b/includes/class-contact-form.php
+index af7d240..4452808 100644
+--- a/includes/class-contact-form.php
++++ b/includes/class-contact-form.php
+@@ -69,7 +69,7 @@ class SCFB_Contact_Form {
+ 		wp_register_script(
+ 			'scfb-contact-form-block-editor',
+ 			$this->plugin_url . 'blocks/contact-form/index.js',
+-			array( 'wp-blocks', 'wp-block-editor', 'wp-server-side-render', 'wp-element', 'wp-components', 'wp-i18n' ),
++			array( 'wp-blocks', 'wp-block-editor', 'wp-server-side-render', 'wp-element', 'wp-components', 'wp-i18n', 'wp-primitives' ),
+ 			self::VERSION,
+ 			true
+ 		);
