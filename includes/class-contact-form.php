@@ -22,6 +22,27 @@ class SCFB_Contact_Form {
 	private const RATE_LIMIT = 3;
 
 	/**
+	 * Maximum length for name field.
+	 *
+	 * @var int
+	 */
+	private const MAX_NAME_LENGTH = 100;
+
+	/**
+	 * Maximum length for email field.
+	 *
+	 * @var int
+	 */
+	private const MAX_EMAIL_LENGTH = 254;
+
+	/**
+	 * Maximum length for message field.
+	 *
+	 * @var int
+	 */
+	private const MAX_MESSAGE_LENGTH = 5000;
+
+	/**
 	 * Plugin version.
 	 *
 	 * @var string
@@ -91,6 +112,12 @@ class SCFB_Contact_Form {
 	 * @return void
 	 */
 	public function handle_submission() {
+		// Validate request method.
+		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'POST' !== $_SERVER['REQUEST_METHOD'] ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid request method.', 'simple-contact-form-block' ) ) );
+			return;
+		}
+
 		// Security check.
 		if ( ! $this->verify_security() ) {
 			wp_send_json_error( array( 'message' => __( 'Security check failed.', 'simple-contact-form-block' ) ) );
@@ -154,6 +181,19 @@ class SCFB_Contact_Form {
 			return new WP_Error( 'missing_fields', __( 'Please fill in all required fields with valid information.', 'simple-contact-form-block' ) );
 		}
 
+		// Validate input length limits.
+		if ( mb_strlen( $name ) > self::MAX_NAME_LENGTH ) {
+			return new WP_Error( 'name_too_long', __( 'Name is too long. Please keep it under 100 characters.', 'simple-contact-form-block' ) );
+		}
+
+		if ( mb_strlen( $email ) > self::MAX_EMAIL_LENGTH ) {
+			return new WP_Error( 'email_too_long', __( 'Email address is too long. Please use a valid email address.', 'simple-contact-form-block' ) );
+		}
+
+		if ( mb_strlen( $message ) > self::MAX_MESSAGE_LENGTH ) {
+			return new WP_Error( 'message_too_long', __( 'Message is too long. Please keep it under 5000 characters.', 'simple-contact-form-block' ) );
+		}
+
 		// Validate email format.
 		if ( ! is_email( $email ) ) {
 			return new WP_Error( 'invalid_email', __( 'Please fill in all required fields with valid information.', 'simple-contact-form-block' ) );
@@ -183,7 +223,11 @@ class SCFB_Contact_Form {
 	 * @return bool True if URL is detected.
 	 */
 	private function contains_url( $text ) {
-		return ! empty( $text ) && ( strpos( $text, 'http://' ) !== false || strpos( $text, 'https://' ) !== false );
+		if ( empty( $text ) ) {
+			return false;
+		}
+
+		return false !== strpos( $text, 'http://' ) || false !== strpos( $text, 'https://' );
 	}
 
 	/**
@@ -193,6 +237,10 @@ class SCFB_Contact_Form {
 	 * @return bool True if newlines are detected.
 	 */
 	private function contains_newlines( $text ) {
+		if ( empty( $text ) ) {
+			return false;
+		}
+
 		return false !== strpos( $text, "\n" ) || false !== strpos( $text, "\r" );
 	}
 
@@ -202,7 +250,7 @@ class SCFB_Contact_Form {
 	 * @return string Transient key.
 	 */
 	private function get_rate_limit_key() {
-		$ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
 		return 'scfb_contact_form_' . md5( $ip );
 	}
 
@@ -252,9 +300,9 @@ class SCFB_Contact_Form {
 	 * @return bool True on success, false on failure.
 	 */
 	private function send_email( $data ) {
-		$to = $this->get_recipient_email();
+		$to      = $this->get_recipient_email();
 		$subject = sprintf( __( 'Contact Form Submission from %s', 'simple-contact-form-block' ), get_bloginfo( 'name' ) );
-		$body = $this->build_email_body( $data );
+		$body    = $this->build_email_body( $data );
 		$headers = $this->build_email_headers( $data );
 
 		return wp_mail( $to, $subject, $body, $headers );
@@ -267,38 +315,78 @@ class SCFB_Contact_Form {
 	 * @return string Email address.
 	 */
 	private function get_recipient_email() {
-		// Default to admin email.
-		$recipient_email = get_option( 'admin_email' );
-
-		// Get post ID from POST or referer.
+		// Get post ID from POST data.
 		$post_id = ! empty( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
 
-		if ( ! $post_id ) {
-			// Fallback: try to get from referer.
-			$referer = wp_get_referer();
-			if ( $referer ) {
-				$post_id = url_to_postid( $referer );
+		// Try to find email in the identified post.
+		if ( $post_id > 0 ) {
+			$found_email = $this->get_email_from_post( $post_id );
+			if ( $found_email ) {
+				return $found_email;
 			}
 		}
 
-		// Retrieve recipient email from block attributes in post content.
-		if ( $post_id > 0 ) {
-			$post = get_post( $post_id );
-			if ( $post ) {
-				$blocks = parse_blocks( $post->post_content );
-				foreach ( $blocks as $block ) {
-					if ( 'scfb/contact-form' === $block['blockName'] && ! empty( $block['attrs']['email'] ) ) {
-						$block_email = sanitize_email( $block['attrs']['email'] );
-						if ( is_email( $block_email ) ) {
-							$recipient_email = $block_email;
-							break;
-						}
-					}
+		// Fallback: check current post if on a singular page.
+		if ( is_singular() ) {
+			$current_post = get_post();
+			if ( $current_post && $current_post->ID !== $post_id ) {
+				$found_email = $this->get_email_from_post( $current_post->ID );
+				if ( $found_email ) {
+					return $found_email;
 				}
 			}
 		}
 
-		return $recipient_email;
+		// Final fallback: admin email.
+		return get_option( 'admin_email' );
+	}
+
+	/**
+	 * Gets recipient email from a post's block content.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return string|false Email address if found, false otherwise.
+	 */
+	private function get_email_from_post( $post_id ) {
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return false;
+		}
+
+		$blocks = parse_blocks( $post->post_content );
+		return $this->find_contact_form_email( $blocks );
+	}
+
+	/**
+	 * Recursively searches blocks for contact form block with email attribute.
+	 *
+	 * @param array $blocks Array of blocks to search.
+	 * @return string|false Email address if found, false otherwise.
+	 */
+	private function find_contact_form_email( $blocks ) {
+		if ( ! is_array( $blocks ) ) {
+			return false;
+		}
+
+		foreach ( $blocks as $block ) {
+			// Check if this is a contact form block with email attribute.
+			if ( 'scfb/contact-form' === $block['blockName'] && ! empty( $block['attrs']['email'] ) ) {
+				$block_email = sanitize_email( $block['attrs']['email'] );
+				if ( is_email( $block_email ) ) {
+					return $block_email;
+				}
+			}
+
+			// Recursively search inner blocks.
+			if ( ! empty( $block['innerBlocks'] ) ) {
+				$found_email = $this->find_contact_form_email( $block['innerBlocks'] );
+				if ( $found_email ) {
+					return $found_email;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -327,7 +415,7 @@ class SCFB_Contact_Form {
 	 */
 	private function build_email_headers( $data ) {
 		return array(
-			'From: ' . $data['name'] . ' <' . $data['email'] . '>',
+			'From: ' . get_bloginfo( 'name' ) . ' <noreply@carnavalsanfrancisco.org>',
 			'Reply-To: ' . $data['email'],
 			'Content-Type: text/plain; charset=UTF-8',
 		);
@@ -379,7 +467,7 @@ class SCFB_Contact_Form {
 		}
 
 		// Check widget content.
-		$widgets = get_option( 'widget_block', array() );
+		$widgets        = get_option( 'widget_block', array() );
 		$widget_content = '';
 		foreach ( $widgets as $widget ) {
 			if ( ! empty( $widget['content'] ) ) {
