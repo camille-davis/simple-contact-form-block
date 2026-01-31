@@ -19,7 +19,7 @@ class SCFB_Contact_Form {
 	 *
 	 * @var int
 	 */
-	private const RATE_LIMIT = 3;
+	private const RATE_LIMIT = 10;
 
 	/**
 	 * Maximum length for name field.
@@ -415,7 +415,6 @@ class SCFB_Contact_Form {
 	 */
 	private function build_email_headers( $data ) {
 		return array(
-			'From: ' . get_bloginfo( 'name' ) . ' <noreply@carnavalsanfrancisco.org>',
 			'Reply-To: ' . $data['email'],
 			'Content-Type: text/plain; charset=UTF-8',
 		);
